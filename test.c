@@ -3,6 +3,8 @@
 #include <linux/init.h> /* Определения макросов */
 #include <linux/fs.h>
 #include <asm/uaccess.h> /* put_user */
+#include <linux/wait.h>
+#include <linux/sched.h>
 
 // Ниже мы задаём информацию о модуле, которую можно будет увидеть с помощью Modinfo
 MODULE_LICENSE( "GPL" );
