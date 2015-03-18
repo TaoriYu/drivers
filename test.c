@@ -8,7 +8,7 @@
 MODULE_LICENSE( "GPL" );
 MODULE_AUTHOR( "Alex Petrov <petroff.alex@gmail.com>" );
 MODULE_DESCRIPTION( "My nice module" );
-MODULE_SUPPORTED_DEVICE( "test" ); /* /dev/testdevice */
+//MODULE_SUPPORTED_DEVICE( "test" ); /* /dev/testdevice */
 
 #define SUCCESS 0
 #define DEVICE_NAME "test" /* Имя нашего устройства */
@@ -22,7 +22,7 @@ static ssize_t device_write( struct file *, const char *, size_t, loff_t * );
 // Глобальные переменные, объявлены как static, воизбежание конфликтов имен.
 static int major_number; /* Старший номер устройства нашего драйвера */
 static int is_device_open = 0; /* Используется ли девайс ? */
-static char text[ 5 ] = "test\n"; /* Текст, который мы будет отдавать при обращении к нашему устройству */
+static char text[ 100 ] = "my new text\n"; /* Текст, который мы будет отдавать при обращении к нашему устройству */
 static char* text_ptr = text; /* Указатель на текущую позицию в тексте */
 
 // Прописываем обработчики операций на устройством
@@ -87,9 +87,7 @@ static int device_release( struct inode *inode, struct file *file )
  return SUCCESS;
 }
 
-static ssize_t
-
-device_write( struct file *filp, const char *buff, size_t len, loff_t * off )
+static ssize_t device_write( struct file *filp, const char *buff, size_t len, loff_t * off )
 {
  printk( "Sorry, this operation isn't supported.\n" );
  return -EINVAL;
@@ -105,12 +103,14 @@ static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
  if ( *text_ptr == 0 )
   return 0;
 
- while ( length && *text_ptr )
+ copy_to_user( buffer, text, length );
+
+ /*while ( length && *text_ptr )
  {
   put_user( *( text_ptr++ ), buffer++ );
   length--;
   byte_read++;
- }
+ }*/
 
  return byte_read;
 }
