@@ -114,7 +114,8 @@ static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
 
  while ( length && *text_ptr )
  {
-  put_user( *( text_ptr++ ), buffer++ );
+  if ( put_user( *( text_ptr++ ), buffer++ ) ) 
+    return -EFAULT;
   length--;
   byte_read++;
  }
