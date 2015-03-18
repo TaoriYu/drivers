@@ -8,7 +8,8 @@
 MODULE_LICENSE( "GPL" );
 MODULE_AUTHOR( "Alex Petrov <petroff.alex@gmail.com>" );
 MODULE_DESCRIPTION( "My nice module" );
-//MODULE_SUPPORTED_DEVICE( "test" ); /* /dev/testdevice */
+
+static DECLARE_WAIT_QUEUE_HEAD( queue );
 
 #define SUCCESS 0
 #define DEVICE_NAME "test" /* Имя нашего устройства */
@@ -20,6 +21,7 @@ static ssize_t device_read( struct file *, char *, size_t, loff_t * );
 static ssize_t device_write( struct file *, const char *, size_t, loff_t * );
 
 // Глобальные переменные, объявлены как static, воизбежание конфликтов имен.
+static int flag = 0;
 static int major_number; /* Старший номер устройства нашего драйвера */
 static int is_device_open = 0; /* Используется ли девайс ? */
 static char text[ 100 ] = "my new text\n"; /* Текст, который мы будет отдавать при обращении к нашему устройству */
@@ -91,8 +93,10 @@ static ssize_t device_write( struct file *filp, const char *buffer, size_t lengt
 {
  //printk( "Sorry, this operation isn't supported.\n" );
  //return -EINVAL;
-
+  flag = 1;
   copy_from_user( text, buffer, length );
+  wake_up_interruptible( &queue );
+  printk( KERN_ALERT "Good morning! :D\n" );
   return length;
 }
 
@@ -112,6 +116,10 @@ static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
   length--;
   byte_read++;
  }
+
+ printk( KERN_ALERT "Good knight\n" );
+ wait_event_interruptible( queue, flag != 0 ); 
+ flag = 0;
 
  return byte_read;
 }
