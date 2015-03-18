@@ -103,14 +103,12 @@ static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
  if ( *text_ptr == 0 )
   return 0;
 
- copy_to_user( buffer, text, length );
-
- /*while ( length && *text_ptr )
+ while ( length && *text_ptr )
  {
   put_user( *( text_ptr++ ), buffer++ );
   length--;
   byte_read++;
- }*/
+ }
 
  return byte_read;
 }
