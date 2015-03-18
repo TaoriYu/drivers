@@ -89,8 +89,12 @@ static int device_release( struct inode *inode, struct file *file )
 
 static ssize_t device_write( struct file *filp, const char *buff, size_t len, loff_t * off )
 {
- printk( "Sorry, this operation isn't supported.\n" );
- return -EINVAL;
+ //printk( "Sorry, this operation isn't supported.\n" );
+ //return -EINVAL;
+  int byte_write = 0;
+
+  copy_from_user( text, buffer, length );
+  return zs;
 }
 
 static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
