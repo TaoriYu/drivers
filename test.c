@@ -102,27 +102,26 @@ static ssize_t device_write( struct file *filp, const char *buffer, size_t lengt
   return length;
 }
 
-static ssize_t device_read( struct file *filp, /* include/linux/fs.h */
-       char *buffer, /* buffer */
-       size_t length, /* buffer length */
-       loff_t * offset )
+static ssize_t device_read( struct file *filp, char *buffer, size_t length, loff_t * offset )
 {
  int byte_read = 0;
 
  if ( *text_ptr == 0 )
   return 0;
 
- while ( length && *text_ptr )
+ copy_to_user( buffer, text, length );
+
+ /*while ( length && *text_ptr )
  {
   if ( put_user( *( text_ptr++ ), buffer++ ) ) 
     return -EFAULT;
   length--;
   byte_read++;
- }
+ }*/
 
- printk( KERN_ALERT "Good knight\n" );
- wait_event_interruptible( queue, flag != 0 ); 
- flag = 0;
+ //printk( KERN_ALERT "Good night\n" );
+ //wait_event_interruptible( queue, flag != 0 ); 
+ //flag = 0;
 
- return byte_read;
+ return length;
 }
