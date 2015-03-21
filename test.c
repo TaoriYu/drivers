@@ -12,7 +12,6 @@ MODULE_DESCRIPTION( "My test module" );
 
 static DECLARE_WAIT_QUEUE_HEAD( queue );
 
-#define SUCCESS 0
 #define DEVICE_NAME "test"
 
 static int device_open( struct inode *, struct file * );
@@ -22,7 +21,8 @@ static ssize_t device_write( struct file *, const char *, size_t, loff_t * );
 
 static int flag = 0;
 static int major_number; /* Старший номер устройства нашего драйвера */
-static int is_device_open = 0; /* Используется ли девайс ? */
+static int are_we_reading = 0;
+static int are_we_writing = 0;
 static char text[ 100 ] = "my new text\n";
 static char* text_ptr = text; /* Указатель на текущую позицию в тексте */
 
@@ -50,11 +50,10 @@ static int __init test_init( void )
         return major_number;
     }
 
-    sema_init( &sem, 1 );
     printk( "Test module is loaded!\n" );
     printk( "Please, create a dev file with 'mknod /dev/test c %d 0'.\n", major_number );
 
-    return SUCCESS;
+    return 0;
 }
 
 
@@ -73,22 +72,57 @@ module_exit( test_exit );
 static int device_open( struct inode *inode, struct file *file )
 {
     text_ptr = text;
-    if ( is_device_open ) return -EBUSY;
-    is_device_open++;
-    return SUCCESS;
+
+    if ( ( file->f_flags & O_ACCMODE ) == O_RDONLY)
+    {
+
+      if(are_we_reading)
+      {
+        printk("We are busy by reading\n");
+        return -EBUSY;
+      }
+
+      are_we_reading = 1;
+
+    }
+
+    if ( ( file->f_flags & O_ACCMODE ) == O_WRONLY )
+    {
+
+      if(are_we_writing)
+      {
+        printk("We are busy\n");
+        return -EBUSY;
+      }
+
+      are_we_writing = 1;
+
+    }
+
+    return 0;
 }
 
 
 static int device_release( struct inode *inode, struct file *file )
 {
-    is_device_open--;
-    return SUCCESS;
+    if ( ( file->f_flags & O_ACCMODE ) == O_WRONLY )
+    {
+      are_we_writing = 0;
+    }
+
+    if ( ( file->f_flags & O_ACCMODE ) == O_RDONLY )
+    {
+      are_we_reading = 0;
+    }
+
+    return 0;
 }
 
 
-static ssize_t device_write( struct file *filp, const char *buffer, size_t length, loff_t * off )
+static ssize_t device_write( struct file *file, const char *buffer, size_t length, loff_t * off )
 {
     flag = 1;
+    text_ptr = text;
     copy_from_user( text, buffer, length );
     printk( KERN_ALERT "Good morning! :D\n" );
     wake_up_interruptible( &queue );
@@ -96,15 +130,15 @@ static ssize_t device_write( struct file *filp, const char *buffer, size_t lengt
 }
 
 
-static ssize_t device_read( struct file *filp, char *buffer, size_t length, loff_t * offset )
+static ssize_t device_read( struct file *file, char *buffer, size_t length, loff_t * offset )
 {
     ssize_t ret;
 
-    if ( *text_ptr == 0 ) return 0;
-    printk( KERN_ALERT "Good night\n" );
-    wait_event_interruptible( queue, flag != 0 ); 
-    flag = 0;
+    if ( text_ptr == 0 ) wait_event_interruptible( queue, flag != 0 );
+    printk( KERN_ALERT "Good night\n" );  
     ret = copy_to_user( buffer, text, length );
+    text_ptr = 0;
+    flag = 0;
 
  /*while ( length && *text_ptr )
  {
