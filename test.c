@@ -35,9 +35,9 @@ static const struct file_operations fops = {
 	.release = device_release
 };
 
-static struct user {
+static struct my_user {
 	struct list_head list;
-	int user_id;
+	kuid_t my_user_id;
 	int are_we_reading;
 	int are_we_writing;
 	char text;
@@ -82,11 +82,11 @@ static int device_open(struct inode *inode, struct file *file)
 {
 	if (list_empty(struct list_head *head)) {
 
-		struct user *u;
-		u->user_id = get_current_user()->uid;
-		u->text = kmalloc(100, int flags);
+		struct my_user *u;
+		u->my_user_id = get_current_user()->uid;
+		u->text = kmalloc(100,  file->f_flags);
 		INIT_LIST_HEAD(&u->list);
-		file->privat_data = u->user_id;
+		file->privat_data = u->my_user_id;
 		text_ptr = text;
 		if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
 
@@ -114,17 +114,17 @@ static int device_open(struct inode *inode, struct file *file)
 	else {
 
 		struct list_head *р;
-		struct user *u;
+		struct my_user *u;
 		list_for_each(p, mine->list) {
 
-			u = list_entry(p, struct user, list);
-			if (get_current_user()->uid != u->user_id) {
+			u = list_entry(p, struct my_user, list);
+			if (get_current_user()->uid != u->my_user_id) {
 
-				struct user *u;
-				u->user_id = get_current_user()->uid;
+				struct my_user *u;
+				u->my_user_id = get_current_user()->uid;
 				u->text = kmalloc(100, int flags);
 				INIT_LIST_HEAD(&u->list);
-				file->privat_data = u->user_id;
+				file->privat_data = u->my_user_id;
 				text_ptr = text;
 
 				if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
@@ -186,13 +186,13 @@ static int device_release(struct inode *inode, struct file *file)
 {
 
 	struct list_head *р;
-	struct user *u;
+	struct my_user *u;
 
 	list_for_each(p, mine->list) {
 
-		u = list_entry(p, struct user, list);
+		u = list_entry(p, struct my_user, list);
 
-		if (get_current_user()->uid == u->user_id){
+		if (get_current_user()->uid == u->my_user_id){
 
 			if ((file->f_flags & O_ACCMODE) == O_WRONLY)
 				u->are_we_writing = 0;
@@ -218,17 +218,17 @@ static ssize_t device_write(struct file *file, const char *buffer, size_t length
 	size_t size;
 
 	struct list_head *р;
-	struct user *u;
+	struct my_user *u;
 
 	list_for_each(p, mine->list) {
 
-		u = list_entry(p, struct user, list);
+		u = list_entry(p, struct my_user, list);
 
-		if (get_current_user()->uid == u->user_id){
+		if (get_current_user()->uid == u->my_user_id){
 
 			flag = 1;
 			text_ptr = u->text;
-			copy_from_user(u->text, buffer, size);
+			copy_from_my_user(u->text, buffer, size);
 			pr_alert("Good morning! :D\n");
 			wake_up_interruptible(&queue);
 		}
@@ -243,19 +243,19 @@ static ssize_t device_read(struct file *file, char *buffer, size_t size, loff_t 
 {
 
 	struct list_head *р;
-	struct user *u;
+	struct my_user *u;
 
 	list_for_each(p, mine->list) {
 
-		u = list_entry(p, struct user, list);
+		u = list_entry(p, struct my_user, list);
 
-		if (get_current_user()->uid == u->user_id){
+		if (get_current_user()->uid == u->my_user_id){
 
 			if (text_ptr == 0)
 				wait_event_interruptible(queue, flag != 0);
 
 			pr_alert("Good night\n");
-			ret = copy_to_user(buffer, text, size);
+			ret = copy_to_my_user(buffer, text, size);
 			text_ptr = 0;
 			flag = 0;
 		}
