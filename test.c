@@ -34,6 +34,12 @@ static const struct file_operations fops = {
 	.release = device_release
 };
 
+static struct user {
+	struct list_head list;
+	int user_id;
+	char text;
+};
+
 
 
 static int __init test_init(void)
@@ -63,13 +69,40 @@ static void __exit test_exit(void)
 }
 
 
+
 module_init(test_init);
 module_exit(test_exit);
 
 
+
 static int device_open(struct inode *inode, struct file *file)
 {
-	text_ptr = text;
+	if (list_empty(struct list_head *head))
+	{
+		struct user *u;
+		u->user_id = get_current_user()->uid;
+		u->text = kmalloc(100, int flags);
+		INIT_LIST_HEAD(&u->list);
+		file->privat_data = u->user_id;
+		text_ptr = text;
+	}
+	else
+	{
+		struct list_head *р;
+		list_for_each(p, user)
+		{
+			if (get_current_user()->uid != u->user_id)
+			{
+				struct user *u;
+				u->user_id = get_current_user()->uid;
+				u->text = kmalloc(100, int flags);
+				INIT_LIST_HEAD(&u->list);
+				file->privat_data = u->user_id;
+				text_ptr = text;
+			}
+		}
+	}
+
 
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
 
