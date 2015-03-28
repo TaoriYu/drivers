@@ -20,12 +20,10 @@ static int device_release(struct inode *, struct file *);
 static ssize_t device_read(struct file *, char *, size_t, loff_t *);
 static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 
-static int flag;
+//static int flag;
 static int major_number;
-//static int are_we_reading;
-//static int are_we_writing;
-//static char text[100] = "my new text\n";
-static char *text_ptr;
+static int user_size = 1000;
+
 
 
 static const struct file_operations fops = {
@@ -35,27 +33,36 @@ static const struct file_operations fops = {
 	.release = device_release
 };
 
+
+
 static struct my_user {
 	struct list_head list;
-	kuid_t my_user_id;
-	int are_we_reading;
-	int are_we_writing;
-	char text;
+	int my_user_id; /*идентификатор юзера*/
+	int ptr_head; /*указатель на нчало буфера*/
+	int ptr_tail; /*указатель на конец буфера*/
+	int are_we_reading; /*когда = 1, устройство занято по чтению*/
+	int are_we_writing; /*когда = 1, устройство занято по записи*/
+	char *text; /*буфер*/
 };
+
+static struct my_user *user_buffer;
 
 
 
 static int __init test_init(void)
 {
 	pr_alert("TEST driver loaded!\n");
-
 	major_number = register_chrdev(0, DEVICE_NAME, &fops);
 
 	if (major_number < 0) {
-
 		pr_alert("Registering failed with %d\n", major_number);
 		return major_number;
 	}
+
+	user_buffer = kmalloc(sizeof(user), GFP_KERNEL);
+	INIT_LIST_HEAD(&user_buffer->list);
+	user_buffer->my_user_id = -1;
+	user_buffer->text = NULL;
 
 	pr_alert("Test module is loaded!\n");
 	pr_alert("Create a dev file with 'mknod /dev/test c %d 0'.\n", major_number);
@@ -67,6 +74,14 @@ static int __init test_init(void)
 
 static void __exit test_exit(void)
 {
+	struct list_head *p;
+	struct my_user *u;
+
+	list_for_each(p, &user_buffer->list){
+		u = list_entry(p, struct user, list);
+		kfree(u->text);
+	}
+
 	unregister_chrdev(major_number, DEVICE_NAME);
 	pr_alert("Test module is unloaded!\n");
 }
@@ -80,133 +95,68 @@ module_exit(test_exit);
 
 static int device_open(struct inode *inode, struct file *file)
 {
-	if (list_empty(struct list_head *head)) {
+	int are_we_know_you = 0;
+	struct list_head *p;
+	struct my_user *u;
+	int my_curr_user_id;
+	my_curr_user_id = current_uid().val;
 
-		struct my_user *u;
-		u->my_user_id = get_current_user()->uid;
-		u->text = kmalloc(100,  file->f_flags);
-		INIT_LIST_HEAD(&u->list);
-		file->privat_data = u->my_user_id;
-		text_ptr = text;
-		if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+	list_for_each(p, &user_buffer->list) {
+		u = list_entry(p, struct user, list);
 
-			if (u->are_we_reading) {
-
-		  		pr_alert("We are busy by reading\n");
-		  		return -EBUSY;
-			}
-
-			u->are_we_reading = 1;
+		if (u->my_user_id == my_curr_user_id) {
+			are_we_know_you = 1;
+			break;
 		}
+	}
 
-		if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
+	if (are_we_know_you == 0) {
+		u = kzalloc(sizeof(user), GFP_KERNEL);
+		u->text = kmalloc(sizeof(char) *user_size, GFP_KERNEL);
+		u->my_user_id = my_curr_user_id;
+		INIT_LIST_HEAD(&u->list);
+		list_add(&u->list, &user_buffer->list);
+	}
+	else{
 
-			if (u->are_we_writing) {
+		if ((file->f_flags & O_ACCMODE) == O_WRONLY){
 
-		  		pr_alert("We are busy\n");
+			if (u->are_we_writing == 1){
+				pr_alert("We are busy by wtiting\n");
 		  		return -EBUSY;
 			}
 
 			u->are_we_writing = 1;
 		}
-	}
 
-	else {
+		if ((file->f_flags & O_ACCMODE) == O_RDONLY){
 
-		struct list_head *р;
-		struct my_user *u;
-		list_for_each(p, mine->list) {
-
-			u = list_entry(p, struct my_user, list);
-			if (get_current_user()->uid != u->my_user_id) {
-
-				struct my_user *u;
-				u->my_user_id = get_current_user()->uid;
-				u->text = kmalloc(100, int flags);
-				INIT_LIST_HEAD(&u->list);
-				file->privat_data = u->my_user_id;
-				text_ptr = text;
-
-				if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
-
-					if (u->are_we_reading) {
-
-		  				pr_alert("We are busy by reading\n");
-		  				return -EBUSY;
-					}
-
-					u->are_we_reading = 1;
-				}
-
-				if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
-
-					if (u->are_we_writing) {
-
-		  				pr_alert("We are busy\n");
-		  				return -EBUSY;
-					}
-
-					u->are_we_writing = 1;
-				}
+			if (u->are_we_reading == 1){
+				pr_alert("We are busy by reading\n");
+				return -EBUSY;
 			}
+
+			u->are_we_reading = 1;
 		}
 	}
 
+	file->privat_data = u;
 
-	/*if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
-
-		if (are_we_reading) {
-
-		  pr_alert("We are busy by reading\n");
-		  return -EBUSY;
-		}
-
-		are_we_reading = 1;
-
-	}
-
-	if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
-
-		if (are_we_writing) {
-
-		  pr_alert("We are busy\n");
-		  return -EBUSY;
-		}
-
-		are_we_writing = 1;
-
-	}*/
-
-	 return 0;
+	return 0;
 }
 
 
 
 static int device_release(struct inode *inode, struct file *file)
 {
+	struct my_user *temp;
+	temp = file->privat_data;
 
-	struct list_head *р;
-	struct my_user *u;
-
-	list_for_each(p, mine->list) {
-
-		u = list_entry(p, struct my_user, list);
-
-		if (get_current_user()->uid == u->my_user_id){
-
-			if ((file->f_flags & O_ACCMODE) == O_WRONLY)
-				u->are_we_writing = 0;
-
-			if ((file->f_flags & O_ACCMODE) == O_RDONLY)
-				u->are_we_reading = 0;
-		}
-	}
-
-	/*if ((file->f_flags & O_ACCMODE) == O_WRONLY)
-		u->are_we_writing = 0;
+	if ((file->f_flags & O_ACCMODE) == O_WRONLY)
+		temp->are_we_writing --;
 
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
-		u->are_we_reading = 0;*/
+		u->are_we_reading = --;
 
 	return 0;
 }
@@ -215,25 +165,37 @@ static int device_release(struct inode *inode, struct file *file)
 
 static ssize_t device_write(struct file *file, const char *buffer, size_t length, loff_t *off)
 {
-	size_t size;
+	struct u *current;
+	unsigned int free_place, bytes_to_write;
 
-	struct list_head *р;
-	struct my_user *u;
+	current = file->privat_data;
+	free_place = user_size - current->count;
 
-	list_for_each(p, mine->list) {
-
-		u = list_entry(p, struct my_user, list);
-
-		if (get_current_user()->uid == u->my_user_id){
-
-			flag = 1;
-			text_ptr = u->text;
-			copy_from_my_user(u->text, buffer, size);
-			pr_alert("Good morning! :D\n");
-			wake_up_interruptible(&queue);
-		}
+	if (length > free_place){
+		pr_alert("WARNING: I have no free memory now\n");
+		return -ENOMEM;
 	}
-	
+
+	bytes_to_write = length;
+
+	while(bytes_to_write){
+
+		if (current->ptr_tail == user_size)
+			current->ptr_tail = 0;
+
+		if (get_user(current->text[current->ptr_tail], buffer)){
+			pr_alert("ERROR: I cant copy that from userspace.\n");
+			return -EFAULT;
+		}
+
+		buffer++;
+		current->ptr_tail++;
+		current->count++;
+		bytes_to_write--;
+	}
+
+	wake_up_interruptible(&queue);
+
 	return length;
 }
 
@@ -241,25 +203,34 @@ static ssize_t device_write(struct file *file, const char *buffer, size_t length
 
 static ssize_t device_read(struct file *file, char *buffer, size_t size, loff_t *offset)
 {
+	unsigned int bytes_to_read, sended_bytes = 0;
+	struct u *current;
 
-	struct list_head *р;
-	struct my_user *u;
+	current = file->privat_data;
 
-	list_for_each(p, mine->list) {
+	if (current->count == 0)
+		wait_event_interruptible(queue, current->count);
 
-		u = list_entry(p, struct my_user, list);
+	if (current->count >= size)
+		bytes_to_read = size;
+	else
+		bytes_to_read = current->count;
 
-		if (get_current_user()->uid == u->my_user_id){
+	while(bytes_to_read){
+		if (current->head == user_size)
+			current->head = 0;
 
-			if (text_ptr == 0)
-				wait_event_interruptible(queue, flag != 0);
-
-			pr_alert("Good night\n");
-			ret = copy_to_my_user(buffer, text, size);
-			text_ptr = 0;
-			flag = 0;
+		if (put_user(current->text[current->head], buffer)){
+			pr_alert("ERROR: I can't read this.\n");
+			return -EFAULT;
 		}
+
+		buffer++;
+		current->head++;
+		current->count--;
+		bytes_to_read--;
+		sended_bytes++;
 	}
 
-	return size;
+	return (ssize_t) sended_bytes;
 }
